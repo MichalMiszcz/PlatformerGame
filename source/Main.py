@@ -58,6 +58,8 @@ class Enemy(arcade.Sprite):
         # Set up parent class
         super().__init__()
 
+        self.licznik = 0
+
         # Default to face-right
         self.facing_direction = RIGHT_FACING
 
@@ -65,6 +67,8 @@ class Enemy(arcade.Sprite):
         self.cur_texture = 0
         self.delta = 0
         self.scale = CHARACTER_SCALING
+
+        self.move_speed = -1
 
         # Track our state
         self.jumping = False
@@ -253,7 +257,7 @@ class MyGame(arcade.Window):
         self.score = 0
         self.reset_score = True
         self.end_of_map = 0
-        self.level = 1
+        self.level = 3
 
         # sounds
         self.collect_coin_sound = arcade.load_sound(":resources:sounds/coin1.wav")
@@ -420,6 +424,7 @@ class MyGame(arcade.Window):
             self.player_sprite.center_x = PLAYER_START_X
             self.player_sprite.center_y = PLAYER_START_Y
         else:
+            self.level = 1
             self.setup()
         arcade.play_sound(self.game_over)
 
@@ -486,13 +491,24 @@ class MyGame(arcade.Window):
         for enemy in self.scene[LAYER_NAME_ENEMIES]:
             enemy.physics_engine.update()
 
+            #change of direction
+            '''if enemy.change_x == 0:
+                enemy.licznik += 1
+                if enemy.licznik == 5:
+                    enemy.move_speed *= -1
+                    enemy.licznik = 0'''
+
             if enemy.physics_engine.can_jump():
-                enemy.change_x = -1
+                enemy.change_x = enemy.move_speed
 
             if arcade.check_for_collision_with_list(
                     enemy, self.scene[LAYER_NAME_DONT_TOUCH]
             ):
                 enemy.remove_from_sprite_lists()
+
+            if enemy.center_y < -100:
+                enemy.remove_from_sprite_lists()
+
 
         player_collision_list = arcade.check_for_collision_with_lists(
             self.player_sprite,
