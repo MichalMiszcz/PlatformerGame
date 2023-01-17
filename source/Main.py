@@ -4,11 +4,14 @@ Platformer Game
 import math
 import os
 import arcade
+import arcade.gui
+
 
 # Constants
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 650
 SCREEN_TITLE = "Platformer"
+NUMBER_OF_LEVELS = 3
 
 # Constants used to scale our sprites from their original size
 CHARACTER_SCALING = 1
@@ -39,6 +42,12 @@ LAYER_NAME_COINS = "Monety"
 LAYER_NAME_DONT_TOUCH = "Kolce"
 LAYER_NAME_PLAYER = "Player"
 LAYER_NAME_ENEMIES = "Przeciwnicy"
+LAYER_NAME_BULLETS = "Bullets"
+
+# shooting
+SHOOT_SPEED = 15
+BULLET_SPEED = 12
+BULLET_DAMAGE = 25
 
 
 def load_texture_pair(filename):
@@ -138,6 +147,10 @@ class Enemy(arcade.Sprite):
         ]
 
 
+    def death(self):
+        self.remove_from_sprite_lists()
+
+
 class PlayerCharacter(arcade.Sprite):
     """Player Sprite"""
 
@@ -235,7 +248,71 @@ class PlayerCharacter(arcade.Sprite):
             self.health = 5
             return 0
 
-class MyGame(arcade.Window):
+
+class MainMenu(arcade.View):
+    """Class that manages the 'menu' view."""
+
+    def __init__(self):
+        super().__init__()
+
+        # Create the buttons
+        self.start_button = arcade.gui.UIFlatButton(text="Play", width=200)
+        self.quit_button = arcade.gui.UIFlatButton(text="Quit", width=200)
+
+        # Assign callbacks to button events
+        self.start_button.on_click = self.on_click_start
+        self.quit_button.on_click = self.on_click_quit
+
+    def on_show_view(self):
+        """Called when switching to this view."""
+        self.v_box = arcade.gui.UIBoxLayout()
+
+        # title
+        title = arcade.gui.UILabel(text="Platformer Game", font_size=48)
+        self.v_box.add(title.with_space_around(bottom=40))
+
+        # Add the buttons to the v_box
+        self.v_box.add(self.start_button.with_space_around(bottom=20))
+        self.v_box.add(self.quit_button)
+
+        # Create a widget to hold the v_box widget, that will center the buttons
+        self.manager = arcade.gui.UIManager()
+        self.manager.enable()
+        self.manager.add(
+            arcade.gui.UIAnchorWidget(
+                anchor_x="center_x",
+                anchor_y="center_y",
+                child=self.v_box)
+        )
+
+    def on_click_start(self, event):
+        """Use a mouse press to advance to the 'game' view."""
+        game_view = MyGame()
+        self.window.show_view(game_view)
+
+    def on_click_quit(self, event):
+        arcade.exit()
+
+    def on_draw(self):
+        """Draw the menu"""
+        self.clear()
+        self.manager.draw()
+
+        # Set background color
+        arcade.set_background_color(arcade.color.DARK_GREEN)
+
+        # Create a vertical BoxGroup to align buttons
+        self.v_box = arcade.gui.UIBoxLayout()
+
+        # Create the buttons
+        start_button = arcade.gui.UIFlatButton()
+        self.v_box.add(start_button.with_space_around(bottom=20))
+
+        # Again, method 1. Use a child class to handle events.
+        quit_button = arcade.gui.UIFlatButton()
+        self.v_box.add(quit_button)
+
+class MyGame(arcade.View):
     """
     Main application class.
     """
@@ -243,7 +320,7 @@ class MyGame(arcade.Window):
     def __init__(self):
 
         # Call the parent class and set up the window
-        super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
+        super().__init__()
 
         self.tile_map = None
         self.scene = None
@@ -252,31 +329,43 @@ class MyGame(arcade.Window):
         self.player_speed = 0
         self.player_acc = 0
 
+        # Shooting mechanics
+        self.can_shoot = False
+        self.shoot_timer = 0
+        self.shoot_pressed = False
+        self.bullets = 0
+
         self.camera = None
         self.gui_camera = None
         self.score = 0
         self.reset_score = True
         self.end_of_map = 0
-        self.level = 3
+        self.level = 1
 
         # sounds
         self.collect_coin_sound = arcade.load_sound(":resources:sounds/coin1.wav")
         self.jump_sound = arcade.load_sound(":resources:sounds/jump1.wav")
         self.game_over = arcade.load_sound(":resources:sounds/gameover1.wav")
+        self.shoot_sound = arcade.load_sound(":resources:sounds/hurt5.wav")
+        self.hit_sound = arcade.load_sound(":resources:sounds/hit5.wav")
 
         self.new_enemy = 0
 
         arcade.set_background_color(arcade.csscolor.CORNFLOWER_BLUE)
 
-
     def setup(self):
 
         """Set up the game here. Call this function to restart the game."""
 
-        self.camera = arcade.Camera(self.width, self.height)
-        self.gui_camera = arcade.Camera(self.width, self.height)
+        self.camera = arcade.Camera(self.window.width, self.window.height)
+        self.gui_camera = arcade.Camera(self.window.width, self.window.height)
 
-        map_name = f"levels/Level{self.level}.json"
+        if self.level <= NUMBER_OF_LEVELS:
+            map_name = f"levels/Level{self.level}.json"
+        else:
+            game_won = GameWonView()
+            self.window.show_view(game_won)
+            return
 
         # start level with timer equals 0
         self.new_enemy = 0
@@ -305,6 +394,9 @@ class MyGame(arcade.Window):
             self.score = 0
         self.reset_score = True
 
+        # Shooting mechanics
+        self.can_shoot = True
+        self.shoot_timer = 0
 
         # Create the Sprite lists
         self.player_sprite = PlayerCharacter()
@@ -338,6 +430,8 @@ class MyGame(arcade.Window):
             )
             self.scene.add_sprite(LAYER_NAME_ENEMIES, enemy)
 
+        self.scene.add_sprite_list(LAYER_NAME_BULLETS)
+
         # --- Other stuff
         # Set the background color
         if self.tile_map.background_color:
@@ -349,6 +443,9 @@ class MyGame(arcade.Window):
             gravity_constant=GRAVITY,
             walls=self.scene[LAYER_NAME_PLATFORMS],
         )
+
+    def on_show_view(self):
+        self.setup()
 
     def on_draw(self):
         """Render the screen."""
@@ -380,6 +477,15 @@ class MyGame(arcade.Window):
             18,
         )
 
+        bullet_text = f"Bullets: {self.bullets}"
+        arcade.draw_text(
+            bullet_text,
+            870,
+            10,
+            arcade.csscolor.WHITE,
+            18,
+        )
+
     def on_key_press(self, key, modifiers):
         """Called whenever a key is pressed."""
 
@@ -394,6 +500,14 @@ class MyGame(arcade.Window):
         elif (key == arcade.key.LEFT or key == arcade.key.A) and (key == arcade.key.RIGHT or key == arcade.key.D):
             self.player_speed = 0
 
+
+        if key == arcade.key.SPACE:
+            self.shoot_pressed = True
+
+        if key == arcade.key.ESCAPE:
+            game_view = MainMenu()
+            self.window.show_view(game_view)
+
     def on_key_release(self, key, modifiers):
         """Called when the user releases a key."""
 
@@ -401,6 +515,9 @@ class MyGame(arcade.Window):
             self.player_speed = 0
         elif key == arcade.key.RIGHT or key == arcade.key.D:
             self.player_speed = 0
+
+        if key == arcade.key.SPACE:
+            self.shoot_pressed = False
 
     def center_camera_to_player(self):
         screen_center_x = self.player_sprite.center_x - (self.camera.viewport_width / 2)
@@ -425,7 +542,9 @@ class MyGame(arcade.Window):
             self.player_sprite.center_y = PLAYER_START_Y
         else:
             self.level = 1
-            self.setup()
+            game_over = GameOverView()
+            self.window.show_view(game_over)
+            #self.setup()
         arcade.play_sound(self.game_over)
 
 
@@ -475,6 +594,35 @@ class MyGame(arcade.Window):
             else:
                 self.player_sprite.change_x = 0
 
+        if self.score >= 2:
+            self.bullets += 1
+            self.score -= 2
+
+        if self.bullets == 0:
+            self.can_shoot = False
+
+        if self.can_shoot:
+            if self.shoot_pressed:
+                arcade.play_sound(self.shoot_sound)
+                bullet = arcade.Sprite("levels/Sprites/pocisk.png", 1,)
+
+                if self.player_sprite.character_face_direction == RIGHT_FACING:
+                    bullet.change_x = BULLET_SPEED
+                else:
+                    bullet.change_x = -BULLET_SPEED
+
+                bullet.center_x = self.player_sprite.center_x
+                bullet.center_y = self.player_sprite.center_y
+
+                self.scene.add_sprite(LAYER_NAME_BULLETS, bullet)
+                self.bullets -= 1
+                self.can_shoot = False
+        else:
+            self.shoot_timer += 1
+            if self.shoot_timer == SHOOT_SPEED:
+                self.can_shoot = True
+                self.shoot_timer = 0
+
         # animacje
         if self.physics_engine.can_jump():
             self.player_sprite.can_jump = False
@@ -485,18 +633,11 @@ class MyGame(arcade.Window):
             delta_time, [LAYER_NAME_COINS, LAYER_NAME_PLAYER, "Znaki", LAYER_NAME_ENEMIES]
         )
 
-        self.scene.update([LAYER_NAME_ENEMIES])
+        self.scene.update([LAYER_NAME_ENEMIES, LAYER_NAME_BULLETS])
 
         # See if the enemy hit a boundary and needs to reverse direction.
         for enemy in self.scene[LAYER_NAME_ENEMIES]:
             enemy.physics_engine.update()
-
-            #change of direction
-            '''if enemy.change_x == 0:
-                enemy.licznik += 1
-                if enemy.licznik == 5:
-                    enemy.move_speed *= -1
-                    enemy.licznik = 0'''
 
             if enemy.physics_engine.can_jump():
                 enemy.change_x = enemy.move_speed
@@ -509,6 +650,36 @@ class MyGame(arcade.Window):
             if enemy.center_y < -100:
                 enemy.remove_from_sprite_lists()
 
+        for bullet in self.scene[LAYER_NAME_BULLETS]:
+            hit_list = arcade.check_for_collision_with_lists(
+                bullet,
+                [
+                    self.scene[LAYER_NAME_ENEMIES],
+                    self.scene[LAYER_NAME_PLATFORMS],
+                ],
+            )
+
+            if hit_list:
+                bullet.remove_from_sprite_lists()
+
+                for collision in hit_list:
+                    if (
+                            self.scene[LAYER_NAME_ENEMIES]
+                            in collision.sprite_lists
+                    ):
+                        # The collision was with an enemy
+                        collision.death()
+
+                        # Hit sound
+                        arcade.play_sound(self.hit_sound)
+
+                return
+
+            if (bullet.right < 0) or (
+                    bullet.left
+                    > (self.tile_map.width * self.tile_map.tile_width) * TILE_SCALING
+            ):
+                bullet.remove_from_sprite_lists()
 
         player_collision_list = arcade.check_for_collision_with_lists(
             self.player_sprite,
@@ -532,7 +703,7 @@ class MyGame(arcade.Window):
         if self.player_sprite.center_y < -100:
             self.players_death()
 
-            # Did the player touch something they should not?
+        # Did the player touch something they should not?
         if arcade.check_for_collision_with_list(
                 self.player_sprite, self.scene[LAYER_NAME_DONT_TOUCH]
         ):
@@ -552,12 +723,134 @@ class MyGame(arcade.Window):
 
         self.center_camera_to_player()
 
+class GameOverView(arcade.View):
+    """Class to manage the game overview"""
+    def __init__(self):
+        super().__init__()
 
+        # Create the buttons
+        self.restart_button = arcade.gui.UIFlatButton(text="Restart Game", width=200)
+        self.quit_button = arcade.gui.UIFlatButton(text="Quit", width=200)
+
+        # Assign callbacks to button events
+        self.restart_button.on_click = self.on_click_start
+        self.quit_button.on_click = self.on_click_quit
+
+    def on_show_view(self):
+        """Called when switching to this view."""
+        self.v_box = arcade.gui.UIBoxLayout()
+
+        # title
+        title = arcade.gui.UILabel(text="Game over", font_size=48)
+        self.v_box.add(title.with_space_around(bottom=40))
+
+        # Add the buttons to the v_box
+        self.v_box.add(self.restart_button.with_space_around(bottom=20))
+        self.v_box.add(self.quit_button)
+
+        # Create a widget to hold the v_box widget, that will center the buttons
+        self.manager = arcade.gui.UIManager()
+        self.manager.enable()
+        self.manager.add(
+            arcade.gui.UIAnchorWidget(
+                anchor_x="center_x",
+                anchor_y="center_y",
+                child=self.v_box)
+        )
+
+    def on_click_start(self, event):
+        """Use a mouse press to advance to the 'game' view."""
+        game_view = MyGame()
+        self.window.show_view(game_view)
+
+    def on_click_quit(self, event):
+        arcade.exit()
+
+    def on_draw(self):
+        """Draw the menu"""
+        self.clear()
+        self.manager.draw()
+
+        # Set background color
+        arcade.set_background_color(arcade.color.DARK_RED)
+
+        # Create a vertical BoxGroup to align buttons
+        self.v_box = arcade.gui.UIBoxLayout()
+
+        # Create the buttons
+        restart_button = arcade.gui.UIFlatButton()
+        self.v_box.add(restart_button.with_space_around(bottom=20))
+
+        # Again, method 1. Use a child class to handle events.
+        quit_button = arcade.gui.UIFlatButton()
+        self.v_box.add(quit_button)
+
+class GameWonView(arcade.View):
+    def __init__(self):
+        super().__init__()
+
+        # Create the buttons
+        self.start_button = arcade.gui.UIFlatButton(text="Main menu", width=200)
+        self.quit_button = arcade.gui.UIFlatButton(text="Quit", width=200)
+
+        # Assign callbacks to button events
+        self.start_button.on_click = self.on_click_start
+        self.quit_button.on_click = self.on_click_quit
+
+    def on_show_view(self):
+        """Called when switching to this view."""
+        self.v_box = arcade.gui.UIBoxLayout()
+
+        # title
+        title = arcade.gui.UILabel(text="You won!!!", font_size=48)
+        self.v_box.add(title.with_space_around(bottom=40))
+
+        # Add the buttons to the v_box
+        self.v_box.add(self.start_button.with_space_around(bottom=20))
+        self.v_box.add(self.quit_button)
+
+        # Create a widget to hold the v_box widget, that will center the buttons
+        self.manager = arcade.gui.UIManager()
+        self.manager.enable()
+        self.manager.add(
+            arcade.gui.UIAnchorWidget(
+                anchor_x="center_x",
+                anchor_y="center_y",
+                child=self.v_box)
+        )
+
+    def on_click_start(self, event):
+        """Use a mouse press to advance to the 'game' view."""
+        game_view = MainMenu()
+        self.window.show_view(game_view)
+
+    def on_click_quit(self, event):
+        arcade.exit()
+
+    def on_draw(self):
+        """Draw the menu"""
+        self.clear()
+        self.manager.draw()
+
+        # Set background color
+        arcade.set_background_color(arcade.color.GREEN)
+
+        # Create a vertical BoxGroup to align buttons
+        self.v_box = arcade.gui.UIBoxLayout()
+
+        # Create the buttons
+        start_button = arcade.gui.UIFlatButton()
+        self.v_box.add(start_button.with_space_around(bottom=20))
+
+        # Again, method 1. Use a child class to handle events.
+        quit_button = arcade.gui.UIFlatButton()
+        self.v_box.add(quit_button)
 
 def main():
     """Main function"""
-    window = MyGame()
-    window.setup()
+    window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
+    menu_view = MainMenu()
+    window.show_view(menu_view)
     arcade.run()
 
 
