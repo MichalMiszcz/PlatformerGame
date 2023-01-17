@@ -328,6 +328,8 @@ class MyGame(arcade.View):
         self.physics_engine = None
         self.player_speed = 0
         self.player_acc = 0
+        self.down_pressed = False
+        self.bought = False
 
         # Shooting mechanics
         self.can_shoot = False
@@ -379,6 +381,9 @@ class MyGame(arcade.View):
                 "use_spatial_hash": True,
             },
             LAYER_NAME_DONT_TOUCH: {
+                "use_spatial_hash": True,
+            },
+            "Sklep": {
                 "use_spatial_hash": True,
             },
         }
@@ -500,9 +505,11 @@ class MyGame(arcade.View):
         elif (key == arcade.key.LEFT or key == arcade.key.A) and (key == arcade.key.RIGHT or key == arcade.key.D):
             self.player_speed = 0
 
-
         if key == arcade.key.SPACE:
             self.shoot_pressed = True
+
+        if key == arcade.key.DOWN:
+            self.down_pressed = True
 
         if key == arcade.key.ESCAPE:
             game_view = MainMenu()
@@ -518,6 +525,10 @@ class MyGame(arcade.View):
 
         if key == arcade.key.SPACE:
             self.shoot_pressed = False
+
+        if key == arcade.key.DOWN:
+            self.down_pressed = False
+            self.bought = False
 
     def center_camera_to_player(self):
         screen_center_x = self.player_sprite.center_x - (self.camera.viewport_width / 2)
@@ -594,10 +605,6 @@ class MyGame(arcade.View):
             else:
                 self.player_sprite.change_x = 0
 
-        if self.score >= 2:
-            self.bullets += 1
-            self.score -= 2
-
         if self.bullets == 0:
             self.can_shoot = False
 
@@ -629,9 +636,14 @@ class MyGame(arcade.View):
         else:
             self.player_sprite.can_jump = True
 
-        self.scene.update_animation(
-            delta_time, [LAYER_NAME_COINS, LAYER_NAME_PLAYER, "Znaki", LAYER_NAME_ENEMIES]
-        )
+        if self.level == 1:
+            self.scene.update_animation(
+                delta_time, [LAYER_NAME_COINS, LAYER_NAME_PLAYER, "Znaki", LAYER_NAME_ENEMIES]
+            )
+        else:
+            self.scene.update_animation(
+                delta_time, [LAYER_NAME_COINS, LAYER_NAME_PLAYER, "Znaki", LAYER_NAME_ENEMIES, "Sklep"]
+            )
 
         self.scene.update([LAYER_NAME_ENEMIES, LAYER_NAME_BULLETS])
 
@@ -708,6 +720,16 @@ class MyGame(arcade.View):
                 self.player_sprite, self.scene[LAYER_NAME_DONT_TOUCH]
         ):
             self.players_death()
+
+        if self.level > 1:
+            if arcade.check_for_collision_with_list(
+                    self.player_sprite, self.scene["Sklep"]
+            ):
+                if self.down_pressed and not self.bought:
+                    if self.score >= 2:
+                        self.bullets += 1
+                        self.score -= 2
+                        self.bought = True
 
             # See if the user got to the end of the level
         if self.player_sprite.center_x >= self.end_of_map:
