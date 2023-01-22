@@ -17,7 +17,7 @@ class Enemy(arcade.Sprite):
         super().__init__()
 
         # Default to face-right
-        self.facing_direction = Consts.RIGHT_FACING
+        self.facing_direction = Consts.LEFT_FACING
 
         # Used for flipping between image sequences
         self.cur_texture = 0
