@@ -1,20 +1,19 @@
 import arcade
 import Consts
 
+
 def load_texture_pair(filename):
-    """
-    Load a texture pair, with the second being a mirror image.
-    """
     return [
         arcade.load_texture(filename),
         arcade.load_texture(filename, flipped_horizontally=True),
     ]
+
+
 class PlayerCharacter(arcade.Sprite):
     """Player Sprite"""
 
     def __init__(self):
 
-        # Set up parent class
         super().__init__()
 
         # Default to face-right
@@ -47,14 +46,10 @@ class PlayerCharacter(arcade.Sprite):
         texture = load_texture_pair(f"{main_path}9.png")
         self.walk_textures.append(texture)
 
-
         # Set the initial texture
         self.texture = self.idle_texture_pair[0]
 
         self.hit_box = self.texture.hit_box_points
-
-        # health
-        self.health = 5
 
     def update_animation(self, delta_time: float = 1 / 60):
 
@@ -62,7 +57,7 @@ class PlayerCharacter(arcade.Sprite):
         if self.change_x < 0 and self.character_face_direction == Consts.RIGHT_FACING:
             self.character_face_direction = Consts.LEFT_FACING
         elif self.change_x > 0 and self.character_face_direction == Consts.LEFT_FACING:
-            self.character_face_direction = Consts.RIGHT_FACING
+            self.character_face_direction = Consts. RIGHT_FACING
 
         # Jumping animation
         if self.change_y > 0:
@@ -94,14 +89,3 @@ class PlayerCharacter(arcade.Sprite):
         self.texture = self.walk_textures[self.cur_texture][
             self.character_face_direction
         ]
-
-    def death(self):
-        self.health -= 1
-
-        if(self.health > 0):
-            # don't reset game
-            return 1
-        else:
-            # reset game
-            self.health = 5
-            return 0

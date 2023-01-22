@@ -1,26 +1,28 @@
 import arcade
 import arcade.gui
+import Consts
 import Main
 
-class MainMenu(arcade.View):
-    """Class that manages the 'menu' view."""
 
+class MainMenu(arcade.View):
     def __init__(self):
         super().__init__()
 
-        # Create the buttons
+        self.background = arcade.load_texture("levels/Background/background.png")
+
         self.start_button = arcade.gui.UIFlatButton(text="Play", width=200)
         self.quit_button = arcade.gui.UIFlatButton(text="Quit", width=200)
 
-        # Assign callbacks to button events
         self.start_button.on_click = self.on_click_start
         self.quit_button.on_click = self.on_click_quit
 
+        self.v_box = None
+        self.manager = None
+
     def on_show_view(self):
-        """Called when switching to this view."""
         self.v_box = arcade.gui.UIBoxLayout()
 
-        # title
+        # Title
         title = arcade.gui.UILabel(text="Platformer Game", font_size=48)
         self.v_box.add(title.with_space_around(bottom=40))
 
@@ -39,20 +41,19 @@ class MainMenu(arcade.View):
         )
 
     def on_click_start(self, event):
-        """Use a mouse press to advance to the 'game' view."""
         game_view = Main.MyGame()
         self.window.show_view(game_view)
 
-    def on_click_quit(self, event):
+    @staticmethod
+    def on_click_quit(event):
         arcade.exit()
 
     def on_draw(self):
-        """Draw the menu"""
         self.clear()
-        self.manager.draw()
 
-        # Set background color
-        arcade.set_background_color(arcade.color.DARK_GREEN)
+        # Set background
+        arcade.draw_lrwh_rectangle_textured(0, 0, Consts.SCREEN_WIDTH, Consts.SCREEN_HEIGHT, self.background)
+        self.manager.draw()
 
         # Create a vertical BoxGroup to align buttons
         self.v_box = arcade.gui.UIBoxLayout()
@@ -61,12 +62,11 @@ class MainMenu(arcade.View):
         start_button = arcade.gui.UIFlatButton()
         self.v_box.add(start_button.with_space_around(bottom=20))
 
-        # Again, method 1. Use a child class to handle events.
         quit_button = arcade.gui.UIFlatButton()
         self.v_box.add(quit_button)
 
+
 class GameOverView(arcade.View):
-    """Class to manage the game overview"""
     def __init__(self):
         super().__init__()
 
@@ -78,8 +78,10 @@ class GameOverView(arcade.View):
         self.restart_button.on_click = self.on_click_start
         self.quit_button.on_click = self.on_click_quit
 
+        self.v_box = None
+        self.manager = None
+
     def on_show_view(self):
-        """Called when switching to this view."""
         self.v_box = arcade.gui.UIBoxLayout()
 
         # title
@@ -101,20 +103,19 @@ class GameOverView(arcade.View):
         )
 
     def on_click_start(self, event):
-        """Use a mouse press to advance to the 'game' view."""
-        game_view = MyGame()
+        game_view = Main.MyGame()
         self.window.show_view(game_view)
 
-    def on_click_quit(self, event):
+    @staticmethod
+    def on_click_quit(event):
         arcade.exit()
 
     def on_draw(self):
-        """Draw the menu"""
         self.clear()
         self.manager.draw()
 
         # Set background color
-        arcade.set_background_color(arcade.color.DARK_RED)
+        arcade.set_background_color(arcade.color.BLACK)
 
         # Create a vertical BoxGroup to align buttons
         self.v_box = arcade.gui.UIBoxLayout()
@@ -123,9 +124,9 @@ class GameOverView(arcade.View):
         restart_button = arcade.gui.UIFlatButton()
         self.v_box.add(restart_button.with_space_around(bottom=20))
 
-        # Again, method 1. Use a child class to handle events.
         quit_button = arcade.gui.UIFlatButton()
         self.v_box.add(quit_button)
+
 
 class GameWonView(arcade.View):
     def __init__(self):
@@ -139,8 +140,10 @@ class GameWonView(arcade.View):
         self.start_button.on_click = self.on_click_start
         self.quit_button.on_click = self.on_click_quit
 
+        self.v_box = None
+        self.manager = None
+
     def on_show_view(self):
-        """Called when switching to this view."""
         self.v_box = arcade.gui.UIBoxLayout()
 
         # title
@@ -166,7 +169,8 @@ class GameWonView(arcade.View):
         game_view = MainMenu()
         self.window.show_view(game_view)
 
-    def on_click_quit(self, event):
+    @staticmethod
+    def on_click_quit(event):
         arcade.exit()
 
     def on_draw(self):
@@ -175,7 +179,7 @@ class GameWonView(arcade.View):
         self.manager.draw()
 
         # Set background color
-        arcade.set_background_color(arcade.color.GREEN)
+        arcade.set_background_color(arcade.color.LIGHT_BLUE)
 
         # Create a vertical BoxGroup to align buttons
         self.v_box = arcade.gui.UIBoxLayout()

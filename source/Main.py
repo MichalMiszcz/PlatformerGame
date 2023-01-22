@@ -1,8 +1,4 @@
-"""
-Platformer Game
-"""
 import math
-import os
 import arcade
 import arcade.gui
 
@@ -13,13 +9,9 @@ import Consts
 
 
 class MyGame(arcade.View):
-    """
-    Main application class.
-    """
 
     def __init__(self):
 
-        # Call the parent class and set up the window
         super().__init__()
 
         self.tile_map = None
@@ -30,6 +22,7 @@ class MyGame(arcade.View):
         self.player_acc = 0
         self.down_pressed = False
         self.bought = False
+        self.health = 5
 
         # Shooting mechanics
         self.can_shoot = False
@@ -37,14 +30,16 @@ class MyGame(arcade.View):
         self.shoot_pressed = False
         self.bullets = 0
 
+        # UI and camera
         self.camera = None
         self.gui_camera = None
         self.score = 0
         self.reset_score = True
         self.end_of_map = 0
+        self.end_of_map1 = 0
         self.level = 1
 
-        # sounds
+        # Sounds
         self.collect_coin_sound = arcade.load_sound(":resources:sounds/coin1.wav")
         self.jump_sound = arcade.load_sound(":resources:sounds/jump1.wav")
         self.lose = arcade.load_sound(":resources:sounds/lose5.wav")
@@ -59,8 +54,6 @@ class MyGame(arcade.View):
 
     def setup(self):
 
-        """Set up the game here. Call this function to restart the game."""
-
         self.camera = arcade.Camera(self.window.width, self.window.height)
         self.gui_camera = arcade.Camera(self.window.width, self.window.height)
 
@@ -71,7 +64,6 @@ class MyGame(arcade.View):
             self.window.show_view(game_won)
             return
 
-        # start level with timer equals 0
         self.new_enemy = 0
 
         # Layer Specific Options for the Tilemap
@@ -90,11 +82,7 @@ class MyGame(arcade.View):
             },
         }
 
-        # Read in the tiled map
         self.tile_map = arcade.load_tilemap(map_name, Consts.TILE_SCALING, layer_options)
-
-        # Initialize Scene with our TileMap, this will automatically add all layers
-        # from the map as SpriteLists in the scene in the proper order.
         self.scene = arcade.Scene.from_tilemap(self.tile_map)
 
         if self.reset_score:
@@ -105,16 +93,17 @@ class MyGame(arcade.View):
         self.can_shoot = True
         self.shoot_timer = 0
 
-        # Create the Sprite lists
         self.player_sprite = Player.PlayerCharacter()
         self.player_sprite.center_x = Consts.PLAYER_START_X
         self.player_sprite.center_y = Consts.PLAYER_START_Y
         self.scene.add_sprite(Consts.LAYER_NAME_PLAYER, self.player_sprite)
 
-        # koniec mapy
+        # variable for detecting if player ended the level
         self.end_of_map = (self.tile_map.width - 5) * Consts.GRID_PIXEL_SIZE
+        # variable for detecting right edge of tilemap
+        self.end_of_map1 = (self.tile_map.width - 16) * Consts.GRID_PIXEL_SIZE
 
-        # Enemies type 1.
+        # Enemies
         enemies_layer = self.tile_map.object_lists[Consts.LAYER_NAME_ENEMIES]
 
         for my_object in enemies_layer:
@@ -139,29 +128,37 @@ class MyGame(arcade.View):
 
         self.scene.add_sprite_list(Consts.LAYER_NAME_BULLETS)
 
-        # --- Other stuff
-        # Set the background color
         if self.tile_map.background_color:
             arcade.set_background_color(self.tile_map.background_color)
 
-        # Create the 'physics engine'
+        # Create the physics engine
         self.physics_engine = arcade.PhysicsEnginePlatformer(
             self.player_sprite,
             gravity_constant=Consts.GRAVITY,
             walls=self.scene[Consts.LAYER_NAME_PLATFORMS],
         )
 
+    def death(self):
+        self.health -= 1
+
+        if self.health > 0:
+            # don't reset game
+            return 1
+        else:
+            # reset game
+            self.health = 5
+            return 0
+
     def on_show_view(self):
         self.setup()
 
     def on_draw(self):
-        """Render the screen."""
         # Clear the screen to the background color
         self.clear()
 
         self.camera.use()
 
-        # Draw our Scene
+        # Draw scene
         self.scene.draw()
 
         self.gui_camera.use()
@@ -175,7 +172,7 @@ class MyGame(arcade.View):
             18,
         )
 
-        life_text = f"Health: {self.player_sprite.health}"
+        life_text = f"Health: {self.health}"
         arcade.draw_text(
             life_text,
             10,
@@ -194,7 +191,6 @@ class MyGame(arcade.View):
         )
 
     def on_key_press(self, key, modifiers):
-        """Called whenever a key is pressed."""
 
         if key == arcade.key.UP or key == arcade.key.W:
             if self.physics_engine.can_jump():
@@ -218,7 +214,6 @@ class MyGame(arcade.View):
             self.window.show_view(game_view)
 
     def on_key_release(self, key, modifiers):
-        """Called when the user releases a key."""
 
         if key == arcade.key.LEFT or key == arcade.key.A:
             self.player_speed = 0
@@ -238,17 +233,18 @@ class MyGame(arcade.View):
                 self.camera.viewport_height / 2
         )
 
-        # Don't let camera travel past 0
         if screen_center_x < 0:
             screen_center_x = 0
         if screen_center_y < 0:
             screen_center_y = 0
+        if screen_center_x > self.end_of_map1:
+            screen_center_x = self.end_of_map1
         player_centered = screen_center_x, screen_center_y
 
         self.camera.move_to(player_centered)
 
     def players_death(self):
-        if self.player_sprite.death() == 1:
+        if self.death() == 1:
             self.player_sprite.change_x = 0
             self.player_sprite.change_y = 0
             self.player_sprite.center_x = Consts.PLAYER_START_X
@@ -260,12 +256,9 @@ class MyGame(arcade.View):
             self.window.show_view(game_over)
             arcade.play_sound(self.game_over)
 
-
-
     def on_update(self, delta_time):
-        """Movement and game logic"""
 
-        # Enemies type 1.
+        # Enemies
         self.new_enemy += 1
 
         if self.new_enemy == 240:
@@ -293,8 +286,6 @@ class MyGame(arcade.View):
 
                 self.new_enemy = 0
 
-
-
         # Move the player with the physics engine
         self.physics_engine.update()
 
@@ -314,7 +305,7 @@ class MyGame(arcade.View):
         if self.can_shoot:
             if self.shoot_pressed:
                 arcade.play_sound(self.shoot_sound)
-                bullet = arcade.Sprite("levels/Sprites/pocisk.png", 1,)
+                bullet = arcade.Sprite("levels/Sprites/pocisk.png", 1)
 
                 if self.player_sprite.character_face_direction == Consts.RIGHT_FACING:
                     bullet.change_x = Consts.BULLET_SPEED
@@ -333,7 +324,7 @@ class MyGame(arcade.View):
                 self.can_shoot = True
                 self.shoot_timer = 0
 
-        # animacje
+        # Animations
         if self.physics_engine.can_jump():
             self.player_sprite.can_jump = False
         else:
@@ -345,12 +336,12 @@ class MyGame(arcade.View):
             )
         else:
             self.scene.update_animation(
-                delta_time, [Consts.LAYER_NAME_COINS, Consts.LAYER_NAME_PLAYER, "Znaki", Consts.LAYER_NAME_ENEMIES, "Sklep"]
+                delta_time, [Consts.LAYER_NAME_COINS, Consts.LAYER_NAME_PLAYER, "Znaki",
+                             Consts.LAYER_NAME_ENEMIES, "Sklep"]
             )
 
         self.scene.update([Consts.LAYER_NAME_ENEMIES, Consts.LAYER_NAME_BULLETS])
 
-        # See if the enemy hit a boundary and needs to reverse direction.
         for enemy in self.scene[Consts.LAYER_NAME_ENEMIES]:
             enemy.physics_engine.update()
 
@@ -382,10 +373,7 @@ class MyGame(arcade.View):
                             self.scene[Consts.LAYER_NAME_ENEMIES]
                             in collision.sprite_lists
                     ):
-                        # The collision was with an enemy
                         collision.death()
-
-                        # Hit sound
                         arcade.play_sound(self.hit_sound)
 
                 return
@@ -424,6 +412,7 @@ class MyGame(arcade.View):
         ):
             self.players_death()
 
+        # Checking if player touched shop
         if self.level > 1:
             if arcade.check_for_collision_with_list(
                     self.player_sprite, self.scene["Sklep"]
@@ -435,23 +424,19 @@ class MyGame(arcade.View):
                         self.bought = True
                         arcade.play_sound(self.upgrade)
 
-
-            # See if the user got to the end of the level
+        # See if the player got to the end of the level
         if self.player_sprite.center_x >= self.end_of_map:
-            # Advance to the next level
             self.level += 1
 
             # Make sure to keep the score from this level when setting up the next level
             self.reset_score = False
 
-            # Load the next level
             self.setup()
-
 
         self.center_camera_to_player()
 
+
 def main():
-    """Main function"""
     window = arcade.Window(Consts.SCREEN_WIDTH, Consts.SCREEN_HEIGHT, Consts.SCREEN_TITLE)
     menu_view = UI.MainMenu()
     window.show_view(menu_view)

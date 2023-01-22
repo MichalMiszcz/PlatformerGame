@@ -1,10 +1,8 @@
 import arcade
 import Consts
 
+
 def load_texture_pair(filename):
-    """
-    Load a texture pair, with the second being a mirror image.
-    """
     return [
         arcade.load_texture(filename),
         arcade.load_texture(filename, flipped_horizontally=True),
@@ -12,14 +10,11 @@ def load_texture_pair(filename):
 
 
 class Enemy(arcade.Sprite):
-    """Enemy Sprite"""
 
     def __init__(self):
 
         # Set up parent class
         super().__init__()
-
-        self.licznik = 0
 
         # Default to face-right
         self.facing_direction = Consts.RIGHT_FACING
@@ -52,7 +47,6 @@ class Enemy(arcade.Sprite):
         self.walk_textures.append(texture)
         texture = load_texture_pair(f"{main_path}a7.png")
         self.walk_textures.append(texture)
-
 
         # Set the initial texture
         self.texture = self.idle_texture_pair[0]
@@ -97,7 +91,6 @@ class Enemy(arcade.Sprite):
         self.texture = self.walk_textures[self.cur_texture][
             self.facing_direction
         ]
-
 
     def death(self):
         self.remove_from_sprite_lists()
